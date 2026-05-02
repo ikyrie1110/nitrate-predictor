@@ -24,7 +24,22 @@ jobs:
     
     - name: Build EXE
       run: |
-        pyinstaller --onefile --console --name NitratePredictor --add-data "RandomForest_updated_model.joblib;." --add-data "CatBoost_updated_model.joblib;." --add-data "ElasticNet_best_meta_model.joblib;." predict_simple.py
+        pyinstaller --onefile --console --name NitratePredictor `
+          --hidden-import=sklearn `
+          --hidden-import=sklearn.ensemble `
+          --hidden-import=sklearn.tree `
+          --hidden-import=sklearn.linear_model `
+          --hidden-import=sklearn.utils `
+          --hidden-import=sklearn.utils._typedefs `
+          --hidden-import=catboost `
+          --hidden-import=numpy `
+          --hidden-import=joblib `
+          --collect-all sklearn `
+          --collect-all catboost `
+          --add-data "RandomForest_updated_model.joblib;." `
+          --add-data "CatBoost_updated_model.joblib;." `
+          --add-data "ElasticNet_best_meta_model.joblib;." `
+          predict_simple.py
     
     - name: Upload EXE
       uses: actions/upload-artifact@v4
