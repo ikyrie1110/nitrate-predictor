@@ -1,0 +1,33 @@
+name: Build EXE
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy scikit-learn joblib catboost pyinstaller
+    
+    - name: Build EXE
+      run: |
+        pyinstaller --onefile --console --name NitratePredictor --add-data "RandomForest_updated_model.joblib;." --add-data "CatBoost_updated_model.joblib;." --add-data "ElasticNet_best_meta_model.joblib;." predict_simple.py
+    
+    - name: Upload EXE
+      uses: actions/upload-artifact@v4
+      with:
+        name: NitratePredictor
+        path: dist/NitratePredictor.exe
