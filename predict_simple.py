@@ -1,9 +1,17 @@
 import sys
+import os
 import numpy as np
 import joblib
 import warnings
 
 warnings.filterwarnings('ignore')
+
+def resource_path(relative_path):
+    """获取资源文件的绝对路径，支持 PyInstaller 打包"""
+    if hasattr(sys, '_MEIPASS'):
+        # 打包后的临时目录
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 FEATURE_NAMES = ['Year', 'lon', 'NH₄⁺', 'lat', 'SO₄²⁻', 'TAP_NO₃⁻',
                  'T', 'SP', 'NO₂', 'PM₂.₅', 'BC', 'NDVI']
@@ -17,20 +25,20 @@ def main():
     # 加载模型
     print("\n正在加载模型...")
     try:
-        # 加载基模型
+        # 加载基模型（使用 resource_path）
         models = {}
-        models['RandomForest'] = joblib.load('RandomForest_updated_model.joblib')
-        models['CatBoost'] = joblib.load('CatBoost_updated_model.joblib')
+        models['RandomForest'] = joblib.load(resource_path('RandomForest_updated_model.joblib'))
+        models['CatBoost'] = joblib.load(resource_path('CatBoost_updated_model.joblib'))
 
         # 尝试加载其他模型（如果有）
         for name in ['GradientBoosting', 'XGBoost']:
             try:
-                models[name] = joblib.load(f'{name}_updated_model.joblib')
+                models[name] = joblib.load(resource_path(f'{name}_updated_model.joblib'))
             except:
                 pass
 
         # 加载元模型
-        meta_model = joblib.load('ElasticNet_best_meta_model.joblib')
+        meta_model = joblib.load(resource_path('ElasticNet_best_meta_model.joblib'))
     except Exception as e:
         print(f"模型加载失败: {e}")
         input("按回车键退出...")
@@ -91,7 +99,7 @@ def main():
         except ValueError:
             print("❌ 输入错误: 请确保输入的是数字")
         except Exception as e:
-            print(f"❌ 预测失败: {e}")
+            print(f"❌ 估算失败: {e}")
 
 
 if __name__ == "__main__":
