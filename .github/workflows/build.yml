@@ -33,6 +33,10 @@ jobs:
         python -c "import joblib; print('joblib:', joblib.__version__)"
         python -c "import catboost; print('catboost:', catboost.__version__)"
     
+    - name: Test model prediction
+      run: |
+        python -c "import joblib; import numpy as np; rf = joblib.load('RandomForest_updated_model.joblib'); test = np.array([[2020,116.4,12.5,39.9,15.2,8.3,15.6,1013,25.1,45.3,2.1,0.65]]); print('RF prediction:', rf.predict(test)[0])"
+    
     - name: Build EXE
       run: |
         pyinstaller --onefile --console --name NitratePredictor `
@@ -44,12 +48,10 @@ jobs:
           --hidden-import=catboost `
           --add-data "RandomForest_updated_model.joblib;." `
           --add-data "CatBoost_updated_model.joblib;." `
+          --add-data "GradientBoosting_updated_model.joblib;." `
+          --add-data "XGBoost_updated_model.joblib;." `
           --add-data "ElasticNet_best_meta_model.joblib;." `
           predict_simple.py
-    
-    - name: Test the exe
-      run: |
-        echo "2020 116.4 12.5 39.9 15.2 8.3 15.6 1013 25.1 45.3 2.1 0.65" | dist\NitratePredictor.exe
     
     - name: Upload EXE
       uses: actions/upload-artifact@v4
