@@ -29,13 +29,16 @@ def main():
         models = {}
         models['RandomForest'] = joblib.load(resource_path('RandomForest_updated_model.joblib'))
         models['CatBoost'] = joblib.load(resource_path('CatBoost_updated_model.joblib'))
+        models['GradientBoosting'] = joblib.load(resource_path('GradientBoosting_updated_model.joblib'))
+        models['XGBoost'] = joblib.load(resource_path('XGBoost_updated_model.joblib'))
+        
 
-        # 尝试加载其他模型（如果有）
-        for name in ['GradientBoosting', 'XGBoost']:
-            try:
-                models[name] = joblib.load(resource_path(f'{name}_updated_model.joblib'))
-            except:
-                pass
+        # # 尝试加载其他模型（如果有）
+        # for name in ['GradientBoosting', 'XGBoost']:
+        #     try:
+        #         models[name] = joblib.load(resource_path(f'{name}_updated_model.joblib'))
+        #     except:
+        #         pass
 
         # 加载元模型
         meta_model = joblib.load(resource_path('ElasticNet_best_meta_model.joblib'))
