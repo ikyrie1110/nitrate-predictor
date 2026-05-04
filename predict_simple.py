@@ -12,9 +12,9 @@ def resource_path(relative_path):
         # 打包后的临时目录
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
-
-FEATURE_NAMES = ['Year', 'lon', 'NH₄⁺', 'lat', 'SO₄²⁻', 'TAP_NO₃⁻',
-                 'T', 'SP', 'NO₂', 'PM₂.₅', 'BC', 'NDVI']
+    
+FEATURE_NAMES = ['Year', 'Lon', 'Ammonium', 'Lat', 'Sulfate', 'Nitrate_TAP',
+                 'Temp', 'SurfacePressure', 'NO2', 'PM2.5', 'BC', 'NDVI']
 
 
 def main():
