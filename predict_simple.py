@@ -7,6 +7,15 @@ import warnings
 from tkinter import filedialog, Tk
 from tkinter import messagebox
 
+# 尝试导入tqdm，如果没有则安装
+try:
+    from tqdm import tqdm
+
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
+    print("Tip: Install 'tqdm' for better progress bar: pip install tqdm")
+
 warnings.filterwarnings('ignore')
 
 
@@ -51,10 +60,10 @@ def load_models():
         # Load meta model
         meta_model = joblib.load(resource_path('ElasticNet_best_meta_model.joblib'))
 
-        print("Models loaded successfully!")
+        print("✅ Models loaded successfully!")
         return models, meta_model
     except Exception as e:
-        print(f"Model loading failed: {e}")
+        print(f"❌ Model loading failed: {e}")
         return None, None
 
 
@@ -100,34 +109,82 @@ def map_columns(df):
     return df_mapped
 
 
+def create_progress_bar(total, desc="Estimating"):
+    """创建进度条"""
+    if TQDM_AVAILABLE:
+        return tqdm(total=total, desc=desc, unit='samples',
+                    bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
+    else:
+        # 简单的文本进度条
+        return SimpleProgressBar(total, desc)
+
+
+class SimpleProgressBar:
+    """简单的文本进度条（当tqdm不可用时）"""
+
+    def __init__(self, total, desc="Progress"):
+        self.total = total
+        self.desc = desc
+        self.current = 0
+        self.last_percent = 0
+
+    def update(self, n=1):
+        self.current += n
+        percent = int(100 * self.current / self.total)
+        if percent > self.last_percent:
+            self.last_percent = percent
+            # 每10%显示一次
+            if percent % 10 == 0:
+                print(f"  {self.desc}: {percent}% ({self.current}/{self.total})")
+
+    def close(self):
+        print(f"  {self.desc}: 100% ({self.total}/{self.total}) - Complete!")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
 def predict_batch(input_file_path, output_file_path, models, meta_model):
     """Batch prediction and save results"""
     try:
         # Read input CSV
-        print(f"\nReading input file: {input_file_path}")
+        print(f"\n📖 Reading input file: {input_file_path}")
         df_original = pd.read_csv(input_file_path)
 
-        print(f"Original columns: {list(df_original.columns)}")
+        # print(f"📋 Original columns: {list(df_original.columns)}")
 
         # Map column names for feature extraction
         df_mapped = map_columns(df_original)
-        print(f"Mapped columns for features: {list(df_mapped.columns)}")
+        print(f"columns: {list(df_mapped.columns)}")
 
         # Check if necessary feature columns exist after mapping
         missing_cols = [col for col in FEATURE_NAMES if col not in df_mapped.columns]
         if missing_cols:
-            print(f"Input file missing required columns: {missing_cols}")
+            print(f"❌ Input file missing required columns: {missing_cols}")
             print(f"Required columns: {FEATURE_NAMES}")
             print(f"Your available columns: {list(df_mapped.columns)}")
             return False
 
-        print(f"Successfully loaded {len(df_mapped)} records")
+        print(f"✅ Successfully loaded {len(df_mapped)} records")
 
         # Store predictions
         predictions = []
 
-        # Predict row by row using the 12 features
-        print("\nEstimating nitrate concentration using 12 features...")
+        # Predict row by row using the 12 features with progress bar
+        print("\n🔮 Estimating nitrate concentration...")
+
+        # 创建进度条
+        total_samples = len(df_mapped)
+        if TQDM_AVAILABLE:
+            progress_bar = tqdm(total=total_samples, desc="  Progress",
+                                unit='samples', ncols=80,
+                                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
+        else:
+            progress_bar = SimpleProgressBar(total_samples, "  Progress")
+
         for idx, row in df_mapped.iterrows():
             # Extract the 12 features
             features = row[FEATURE_NAMES].values.reshape(1, -1)
@@ -155,9 +212,10 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
             final_prediction = meta_model.predict(full_features)[0]
             predictions.append(final_prediction)
 
-            # Show progress
-            if (idx + 1) % 100 == 0 or (idx + 1) == len(df_mapped):
-                print(f"  Progress: {idx + 1}/{len(df_mapped)}")
+            # Update progress bar
+            progress_bar.update(1)
+
+        progress_bar.close()
 
         # Create output DataFrame with Year, Month, Lat, Lon, Nitrate
         df_output = pd.DataFrame()
@@ -172,7 +230,7 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         if 'Month' in df_original.columns:
             df_output['Month'] = df_original['Month']
         else:
-            print("Warning: No Month column found, using 1 as default")
+            print("⚠️  Warning: No Month column found, using 1 as default")
             df_output['Month'] = 1
 
         # Add Latitude (Lat)
@@ -181,7 +239,7 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         elif 'Lat' in df_mapped.columns:
             df_output['Lat'] = df_mapped['Lat']
         else:
-            print("Warning: No latitude column found")
+            print("⚠️  Warning: No latitude column found")
             df_output['Lat'] = np.nan
 
         # Add Longitude (Lon)
@@ -190,33 +248,33 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         elif 'Lon' in df_mapped.columns:
             df_output['Lon'] = df_mapped['Lon']
         else:
-            print("Warning: No longitude column found")
+            print("⚠️  Warning: No longitude column found")
             df_output['Lon'] = np.nan
 
         # Add estimation result as Nitrate
         df_output['Nitrate'] = predictions
 
         # Save results
-        print(f"\nSaving results to: {output_file_path}")
+        print(f"\n💾 Saving results to: {output_file_path}")
         df_output.to_csv(output_file_path, index=False, encoding='utf-8-sig')
 
         # Display statistics
         print("\n" + "=" * 50)
-        print("Estimation Statistics:")
-        print(f"  Total samples: {len(df_output)}")
-        print(f"  Nitrate range: [{min(predictions):.4f}, {max(predictions):.4f}]")
-        print(f"  Mean Nitrate: {np.mean(predictions):.4f}")
-        print(f"  Standard deviation: {np.std(predictions):.4f}")
+        print("📊 Estimation Statistics:")
+        print(f"  📍 Total samples: {len(df_output)}")
+        print(f"  📈 Nitrate range: [{min(predictions):.4f}, {max(predictions):.4f}]")
+        print(f"  📊 Mean Nitrate: {np.mean(predictions):.4f}")
+        print(f"  📉 Standard deviation: {np.std(predictions):.4f}")
         print("=" * 50)
 
         # Show first few rows of output
-        print("\nFirst 5 rows of output:")
+        print("\n📄 First 5 rows of output:")
         print(df_output.head())
 
         return True
 
     except Exception as e:
-        print(f"Processing failed: {e}")
+        print(f"❌ Processing failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -224,8 +282,15 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
 
 def main():
     print("\n" + "=" * 60)
-    print("Nitrate Concentration Estimation Tool")
+    print("🎯 Nitrate Concentration Estimation Tool")
     print("=" * 60)
+
+    # 显示进度条状态
+    if TQDM_AVAILABLE:
+        print("✨ Progress bar: Enhanced (tqdm)")
+    else:
+        print("📊 Progress bar: Simple mode (install tqdm for better display)")
+        print("   Run: pip install tqdm")
 
     # Load models
     models, meta_model = load_models()
@@ -257,9 +322,9 @@ def main():
     success = predict_batch(input_file, output_file, models, meta_model)
 
     if success:
-        print(f"\nEstimation completed! Results saved to: {output_file}")
+        print(f"\n✅ Estimation completed! Results saved to: {output_file}")
         # Ask whether to open the file folder
-        open_folder = input("\nOpen file folder? (y/n): ").strip().lower()
+        open_folder = input("\n📂 Open file folder? (y/n): ").strip().lower()
         if open_folder == 'y':
             if sys.platform == 'win32':
                 os.startfile(os.path.dirname(output_file))
