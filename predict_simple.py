@@ -1,89 +1,148 @@
 import sys
 import os
 import numpy as np
+import pandas as pd
 import joblib
 import warnings
+from tkinter import filedialog, Tk
+from tkinter import messagebox
 
 warnings.filterwarnings('ignore')
 
+
 def resource_path(relative_path):
-    """获取资源文件的绝对路径，支持 PyInstaller 打包"""
+    """Get absolute path for resource files, supports PyInstaller packaging"""
     if hasattr(sys, '_MEIPASS'):
-        # 打包后的临时目录
+        # Temporary directory after packaging
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
-    
+
+
+# Required feature names for the model (12 features)
 FEATURE_NAMES = ['Year', 'Lon', 'Ammonium', 'Lat', 'Sulfate', 'Nitrate_TAP',
                  'Temp', 'SurfacePressure', 'NO2', 'PM2.5', 'BC', 'NDVI']
 
+# Column name mapping from your data to model features
+COLUMN_MAPPING = {
+    'Year': 'Year',  # Your 'Year' -> model 'Year'
+    'lat': 'Lat',  # Your 'lat' -> model 'Lat'
+    'lon': 'Lon',  # Your 'lon' -> model 'Lon'
+    'NO₂': 'NO2',  # Your 'NO₂' -> model 'NO2'
+    'T': 'Temp',  # Your 'T' -> model 'Temp'
+    'NH₄⁺': 'Ammonium',  # Your 'NH₄⁺' -> model 'Ammonium'
+    'NO₃⁻': 'Nitrate_TAP',  # Your 'NO₃⁻' -> model 'Nitrate_TAP'
+    'SP': 'SurfacePressure',  # Your 'SP' -> model 'SurfacePressure'
+    'PM₂.₅': 'PM2.5',  # Your 'PM₂.₅' -> model 'PM2.5'
+    'BC': 'BC',  # Your 'BC' -> model 'BC'
+    'SO₄²⁻': 'Sulfate',  # Your 'SO₄²⁻' -> model 'Sulfate'
+    'NDVI': 'NDVI'  # Your 'NDVI' -> model 'NDVI'
+}
 
-def main():
-    print("\n" + "=" * 50)
-    print("硝酸盐浓度估算")
-    print("=" * 50)
 
-    # 加载模型
-    print("\n正在加载模型...")
+def load_models():
+    """Load all models"""
+    print("\nLoading models...")
     try:
-        # 加载基模型（使用 resource_path）
+        # Load base models
         models = {}
         models['RandomForest'] = joblib.load(resource_path('RandomForest_updated_model.joblib'))
         models['CatBoost'] = joblib.load(resource_path('CatBoost_updated_model.joblib'))
-        # models['GradientBoosting'] = joblib.load(resource_path('GradientBoosting_updated_model.joblib'))
-        # models['XGBoost'] = joblib.load(resource_path('XGBoost_updated_model.joblib'))
-        
 
-        # # 尝试加载其他模型（如果有）
-        # for name in ['GradientBoosting', 'XGBoost']:
-        #     try:
-        #         models[name] = joblib.load(resource_path(f'{name}_updated_model.joblib'))
-        #     except:
-        #         pass
-
-        # 加载元模型
+        # Load meta model
         meta_model = joblib.load(resource_path('ElasticNet_best_meta_model.joblib'))
+
+        print("Models loaded successfully!")
+        return models, meta_model
     except Exception as e:
-        print(f"模型加载失败: {e}")
-        input("按回车键退出...")
-        return
+        print(f"Model loading failed: {e}")
+        return None, None
 
-    print("\n" + "-" * 50)
-    print("输入说明:")
-    print("  请一次性输入12个数值，用空格分隔")
-    print(f"  顺序: {' -> '.join(FEATURE_NAMES)}")
-    print("  示例: 2020 116.4 12.5 39.9 15.2 8.3 15.6 1013 25.1 45.3 2.1 0.65")
-    print("  输入 'quit' 退出程序")
-    print("-" * 50)
 
-    while True:
-        print()
-        user_input = input("请输入12个数值: ").strip()
+def select_input_file():
+    """Select input CSV file using file dialog"""
+    root = Tk()
+    root.withdraw()  # Hide main window
+    root.attributes('-topmost', True)  # Bring dialog to front
 
-        if user_input.lower() in ['quit', 'exit', 'q']:
-            print("退出程序")
-            break
+    file_path = filedialog.askopenfilename(
+        title="Select Input CSV File",
+        filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+    )
+    root.destroy()
+    return file_path
 
-        # 处理输入
-        values = user_input.split()
-        if len(values) != 12:
-            print(f"❌ 需要12个数值，您输入了{len(values)}个")
-            continue
 
-        try:
-            # 转换为 numpy 数组（不用 pandas）
-            features = np.array([float(v) for v in values]).reshape(1, -1)
+def select_output_file(default_name="nitrate_estimation.csv"):
+    """Select output CSV file path"""
+    root = Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
 
-            # 基模型预测
+    file_path = filedialog.asksaveasfilename(
+        title="Save Result as CSV File",
+        defaultextension=".csv",
+        filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        initialfile=default_name
+    )
+    root.destroy()
+    return file_path
+
+
+def map_columns(df):
+    """Map your dataframe columns to model feature names"""
+    df_mapped = df.copy()
+
+    # Rename columns according to mapping
+    for your_col, model_col in COLUMN_MAPPING.items():
+        if your_col in df_mapped.columns:
+            df_mapped.rename(columns={your_col: model_col}, inplace=True)
+
+    return df_mapped
+
+
+def predict_batch(input_file_path, output_file_path, models, meta_model):
+    """Batch prediction and save results"""
+    try:
+        # Read input CSV
+        print(f"\nReading input file: {input_file_path}")
+        df_original = pd.read_csv(input_file_path)
+
+        print(f"Original columns: {list(df_original.columns)}")
+
+        # Map column names for feature extraction
+        df_mapped = map_columns(df_original)
+        print(f"Mapped columns for features: {list(df_mapped.columns)}")
+
+        # Check if necessary feature columns exist after mapping
+        missing_cols = [col for col in FEATURE_NAMES if col not in df_mapped.columns]
+        if missing_cols:
+            print(f"Input file missing required columns: {missing_cols}")
+            print(f"Required columns: {FEATURE_NAMES}")
+            print(f"Your available columns: {list(df_mapped.columns)}")
+            return False
+
+        print(f"Successfully loaded {len(df_mapped)} records")
+
+        # Store predictions
+        predictions = []
+
+        # Predict row by row using the 12 features
+        print("\nEstimating nitrate concentration using 12 features...")
+        for idx, row in df_mapped.iterrows():
+            # Extract the 12 features
+            features = row[FEATURE_NAMES].values.reshape(1, -1)
+
+            # Base model predictions
             base_predictions = []
             for name, model in models.items():
                 pred = model.predict(features)[0]
                 base_predictions.append(pred)
 
-            # 构建堆叠特征
+            # Build stacking features
             stacking_features = np.array(base_predictions).reshape(1, -1)
             full_features = np.hstack([stacking_features, features])
 
-            # 处理特征数量不匹配
+            # Handle feature count mismatch
             expected = meta_model.n_features_in_
             if full_features.shape[1] != expected:
                 if full_features.shape[1] < expected:
@@ -92,17 +151,124 @@ def main():
                 else:
                     full_features = full_features[:, :expected]
 
-            # 元模型预测
+            # Meta model prediction
             final_prediction = meta_model.predict(full_features)[0]
+            predictions.append(final_prediction)
 
-            print("-" * 40)
-            print(f"🎯 最终估算结果: {final_prediction:.4f}")
-            print("=" * 40)
+            # Show progress
+            if (idx + 1) % 100 == 0 or (idx + 1) == len(df_mapped):
+                print(f"  Progress: {idx + 1}/{len(df_mapped)}")
 
-        except ValueError:
-            print("❌ 输入错误: 请确保输入的是数字")
-        except Exception as e:
-            print(f"❌ 估算失败: {e}")
+        # Create output DataFrame with Year, Month, Lat, Lon, Nitrate
+        df_output = pd.DataFrame()
+
+        # Add Year
+        if 'Year' in df_original.columns:
+            df_output['Year'] = df_original['Year']
+        else:
+            df_output['Year'] = range(1, len(df_original) + 1)
+
+        # Add Month
+        if 'Month' in df_original.columns:
+            df_output['Month'] = df_original['Month']
+        else:
+            print("Warning: No Month column found, using 1 as default")
+            df_output['Month'] = 1
+
+        # Add Latitude (Lat)
+        if 'lat' in df_original.columns:
+            df_output['Lat'] = df_original['lat']
+        elif 'Lat' in df_mapped.columns:
+            df_output['Lat'] = df_mapped['Lat']
+        else:
+            print("Warning: No latitude column found")
+            df_output['Lat'] = np.nan
+
+        # Add Longitude (Lon)
+        if 'lon' in df_original.columns:
+            df_output['Lon'] = df_original['lon']
+        elif 'Lon' in df_mapped.columns:
+            df_output['Lon'] = df_mapped['Lon']
+        else:
+            print("Warning: No longitude column found")
+            df_output['Lon'] = np.nan
+
+        # Add estimation result as Nitrate
+        df_output['Nitrate'] = predictions
+
+        # Save results
+        print(f"\nSaving results to: {output_file_path}")
+        df_output.to_csv(output_file_path, index=False, encoding='utf-8-sig')
+
+        # Display statistics
+        print("\n" + "=" * 50)
+        print("Estimation Statistics:")
+        print(f"  Total samples: {len(df_output)}")
+        print(f"  Nitrate range: [{min(predictions):.4f}, {max(predictions):.4f}]")
+        print(f"  Mean Nitrate: {np.mean(predictions):.4f}")
+        print(f"  Standard deviation: {np.std(predictions):.4f}")
+        print("=" * 50)
+
+        # Show first few rows of output
+        print("\nFirst 5 rows of output:")
+        print(df_output.head())
+
+        return True
+
+    except Exception as e:
+        print(f"Processing failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def main():
+    print("\n" + "=" * 60)
+    print("Nitrate Concentration Estimation Tool")
+    print("=" * 60)
+
+    # Load models
+    models, meta_model = load_models()
+    if models is None or meta_model is None:
+        input("\nPress Enter to exit...")
+        return
+
+    # Select input file
+    input_file = select_input_file()
+    if not input_file:
+        print("No input file selected. Exiting...")
+        input("\nPress Enter to exit...")
+        return
+
+    # Generate default output filename
+    default_output = os.path.join(
+        os.path.dirname(input_file),
+        f"nitrate_estimation_{os.path.basename(input_file)}"
+    )
+
+    # Select output file
+    output_file = select_output_file(default_output)
+    if not output_file:
+        print("No output file path selected. Exiting...")
+        input("\nPress Enter to exit...")
+        return
+
+    # Perform estimation
+    success = predict_batch(input_file, output_file, models, meta_model)
+
+    if success:
+        print(f"\nEstimation completed! Results saved to: {output_file}")
+        # Ask whether to open the file folder
+        open_folder = input("\nOpen file folder? (y/n): ").strip().lower()
+        if open_folder == 'y':
+            if sys.platform == 'win32':
+                os.startfile(os.path.dirname(output_file))
+            elif sys.platform == 'darwin':  # macOS
+                os.system(f'open "{os.path.dirname(output_file)}"')
+            else:  # Linux
+                os.system(f'xdg-open "{os.path.dirname(output_file)}"')
+
+    input("\nPress Enter to exit...")
 
 
 if __name__ == "__main__":
