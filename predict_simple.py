@@ -14,7 +14,7 @@ try:
     TQDM_AVAILABLE = True
 except ImportError:
     TQDM_AVAILABLE = False
-    print("Tip: Install 'tqdm' for better progress bar: pip install tqdm")
+    # print("Tip: Install 'tqdm' for better progress bar: pip install tqdm")
 
 warnings.filterwarnings('ignore')
 
@@ -285,12 +285,12 @@ def main():
     print("🎯 Nitrate Concentration Estimation Tool")
     print("=" * 60)
 
-    # 显示进度条状态
-    if TQDM_AVAILABLE:
-        print("✨ Progress bar: Enhanced (tqdm)")
-    else:
-        print("📊 Progress bar: Simple mode (install tqdm for better display)")
-        print("   Run: pip install tqdm")
+    # # 显示进度条状态
+    # if TQDM_AVAILABLE:
+    #     # print("✨ Progress bar: Enhanced (tqdm)")
+    # else:
+    #     # print("📊 Progress bar: Simple mode (install tqdm for better display)")
+    #     print("   Run: pip install tqdm")
 
     # Load models
     models, meta_model = load_models()
