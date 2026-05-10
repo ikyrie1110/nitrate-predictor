@@ -210,6 +210,7 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
 
             # Meta model prediction
             final_prediction = meta_model.predict(full_features)[0]
+            final_prediction = max(final_prediction, 0)
             predictions.append(final_prediction)
 
             # Update progress bar
