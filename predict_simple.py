@@ -150,7 +150,7 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         
         # 映射列名
         df_mapped = map_columns(df_original)
-        print(f"Columns: {list(df_mapped.columns)}")
+        # print(f"Columns: {list(df_mapped.columns)}")
         
         # 检查必要列是否存在
         missing_cols = [col for col in FEATURE_NAMES if col not in df_mapped.columns]
@@ -168,8 +168,8 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         
         # 统计负值（如果有）
         negative_count = np.sum(predictions == 0)  # 被裁剪为0的数量
-        if negative_count > 0:
-            print(f"  ⚠️ {negative_count} negative predictions were set to 0")
+        # if negative_count > 0:
+            # print(f"   {negative_count} negative predictions were set to 0")
         
         # 创建输出DataFrame
         df_output = pd.DataFrame()
@@ -209,13 +209,13 @@ def predict_batch(input_file_path, output_file_path, models, meta_model):
         df_output.to_csv(output_file_path, index=False, encoding='utf-8-sig')
         
         # 显示统计信息
-        print("\n" + "=" * 50)
-        print("Estimation Statistics:")
-        print(f"  Total samples: {len(df_output)}")
-        print(f"  Nitrate range: [{predictions.min():.4f}, {predictions.max():.4f}]")
-        print(f"  Mean Nitrate: {predictions.mean():.4f}")
-        print(f"  Standard deviation: {predictions.std():.4f}")
-        print("=" * 50)
+        # print("\n" + "=" * 50)
+        # print("Estimation Statistics:")
+        # print(f"  Total samples: {len(df_output)}")
+        # print(f"  Nitrate range: [{predictions.min():.4f}, {predictions.max():.4f}]")
+        # print(f"  Mean Nitrate: {predictions.mean():.4f}")
+        # print(f"  Standard deviation: {predictions.std():.4f}")
+        # print("=" * 50)
         
         return True
         
@@ -261,8 +261,8 @@ def main():
     success = predict_batch(input_file, output_file, models, meta_model)
     
     if success:
-        print(f"\n✅ Estimation completed! Results saved to: {output_file}")
-        open_folder = input("\n📂 Open file folder? (y/n): ").strip().lower()
+        print(f"\n Estimation completed! Results saved to: {output_file}")
+        open_folder = input("\n Open file folder? (y/n): ").strip().lower()
         if open_folder == 'y':
             if sys.platform == 'win32':
                 os.startfile(os.path.dirname(output_file))
